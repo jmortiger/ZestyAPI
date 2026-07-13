@@ -7,7 +7,7 @@ import Util from "./Util";
 // Bit of a hack, but it works
 // If fetch is not available, falls back onto crossFetch
 const wfFetch = global.fetch ? global.fetch : crossFetch;
-const wfRequest = global.fetch ? Request : CrossRequest;
+const wfRequest = typeof global.fetch === "function" ? Request : CrossRequest;
 
 export default class RequestQueue {
 
