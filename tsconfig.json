@@ -4,7 +4,7 @@
         "outDir": "./dist/",
         "noImplicitAny": false,
         "target": "es2015",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "typeRoots": [
             "node_modules/@types"
         ],
