@@ -44,6 +44,7 @@ export default class Endpoint<T extends APIResponse> {
      * need to be split off into QueryParams.
      * @param {SearchParams} search Search params
      * @returns {QueryParams} Query params
+     * @todo Should the `limit` & `page` properties be `delete`d from `search`?
      */
     protected splitQueryParams(search: SearchParams = {}): QueryParams {
         const result: QueryParams = {};
@@ -74,7 +75,8 @@ export default class Endpoint<T extends APIResponse> {
      * @returns {SearchParams} Validated parameters
      */
     protected validateSearchParams(params: SearchParams = {}): SearchParams {
-        const results = {};
+        const results: SearchParams = {};
+        if (!params) return results;
 
         // Replace param aliases
         for (const [antecedent, consequent] of Object.entries(this.searchParamAliases)) {
@@ -152,7 +154,7 @@ export default class Endpoint<T extends APIResponse> {
         function processValue(
             obj: StringMap,
             key: string,
-            value: PrimitiveType | PrimitiveType[] | PrimitiveMap,
+            value: PrimitiveType | PrimitiveType[] | PrimitiveMap | undefined | null,
             keyReplacement: StringMap = {},
             separator = ",",
             keyStack: string[] = [],
@@ -181,7 +183,7 @@ export default class Endpoint<T extends APIResponse> {
             for (const [key2, value2] of Object.entries(value))
                 processValue(obj, key2, value2, keyReplacement, separator, keyStack);
 
-            function formatKey(key: string, keyStack = []) {
+            function formatKey(key: string, keyStack: string[] = []) {
                 if (keyStack.length == 0) return key;
                 else {
                     let result = keyStack[0];

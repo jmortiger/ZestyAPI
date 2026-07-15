@@ -44,7 +44,7 @@ export default class RequestQueue {
         if (this.running) return;
         this.running = true;
 
-        let currentTask: QueueItem;
+        let currentTask: QueueItem | undefined;
         // eslint-disable-next-line no-cond-assign
         while (currentTask = this.queue.shift()) {
             try {

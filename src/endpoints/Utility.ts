@@ -45,18 +45,18 @@ export default class UtilityEndpoint extends Endpoint<APIResponse> {
     }
 
     /** Test command that always returns error 403 */
-    public async test403(): Promise<FormattedResponse<null>> {
+    public async test403(): Promise<FormattedResponse<never>> {
         return this.api.makeRequest("test403").then(
-            (response: QueueResponse) => Endpoint.formatAPIResponse(response.status, response.data),
-            (error: QueueResponse) => Endpoint.formatAPIResponse(error.status, [])
+            (response: QueueResponse) => { throw new Error("Expected operation to fail."); } /* Endpoint.formatAPIResponse(response.status, response.data) */,
+            (error: QueueResponse) => Endpoint.formatAPIResponse(error.status, [] as never[])
         )
     }
 
     /** Test command that always returns error 404 */
-    public async test404(): Promise<FormattedResponse<null>> {
+    public async test404(): Promise<FormattedResponse<never>> {
         return this.api.makeRequest("test404").then(
-            (response: QueueResponse) => Endpoint.formatAPIResponse(response.status, response.data),
-            (error: QueueResponse) => Endpoint.formatAPIResponse(error.status, [])
+            (response: QueueResponse) => { throw new Error("Expected operation to fail."); } /* Endpoint.formatAPIResponse(response.status, response.data) */,
+            (error: QueueResponse) => Endpoint.formatAPIResponse(error.status, [] as never[])
         )
     }
 

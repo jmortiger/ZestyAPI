@@ -27,7 +27,7 @@ interface BlipSearchParams extends SearchParams {
     // Native
     creator_name?: string,
     /// body_matches?: string,
-    response_to?: number | null,
+    response_to?: number/*  | null */,
     order?: BlipSearchOrder,
 
     // Derived

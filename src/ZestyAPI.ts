@@ -209,7 +209,7 @@ export interface APIQuery {
 }
 namespace APIQuery {
     export function flatten(input: APIQuery): string[] {
-        const result = [];
+        const result: string[] = [];
         for (const [key, value] of Object.entries(input)) {
             if (value === null || typeof value == "undefined") continue;
             result.push(key + "=" + value); // TODO URLEncode???

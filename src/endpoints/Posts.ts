@@ -24,6 +24,7 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
      * Page number and post limit can be specified as parameters.
      * @param {PostSearchParams} params Search parameters
      * @returns {FormattedResponse<APIPost[]>} Post data
+     * @todo Replace empty object w/ undefined in `validateParams`
      */
     public async find(query: PostQueryParams = {}): Promise<FormattedResponse<APIPost>> {
 
@@ -53,7 +54,7 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
      * @returns {FormattedResponse<APIPost>} Post data
      */
     public async get(id: number): Promise<FormattedResponse<APIPost>> {
-        if (typeof id !== "number")
+        if (typeof id !== "number" || !Number.isInteger(id) || id < 0)
             return Endpoint.makeMalformedRequestResponse();
 
         return this.api.makeRequest(`posts/${id}.json`)
@@ -172,7 +173,7 @@ interface PostQueryParams extends QueryParams {
     tags?: string | string[]
 }
 
-interface PostUpdateParams extends SimpleMap {
+interface PostUpdateParams extends Partial<SimpleMap> {
     tag_string?: string,
     old_tag_string?: string,
     tag_string_diff?: string,

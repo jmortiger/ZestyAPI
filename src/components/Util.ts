@@ -34,7 +34,7 @@ export default class Util {
      * @returns {string[]} Encoded array
      */
     public static encodeArray(array: PrimitiveType[]): string[] {
-        const result = [];
+        const result: string[] = [];
         for (const value of array)
             result.push(this.encode(value));
         return result;

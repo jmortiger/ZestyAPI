@@ -31,8 +31,8 @@ export default class IQDBQueriesEndpoint extends Endpoint<APIIQDBResponse> {
     protected validateQueryParams(params?: IQDBQueryParams): IQDBQueryParams {
         const result: IQDBQueryParams = {};
 
-        if (typeof params.url !== "undefined") result.url = params.url;
-        if (typeof params.post_id !== "undefined") result.post_id = params.post_id;
+        if (typeof params?.url !== "undefined") result.url = params.url;
+        if (typeof params?.post_id !== "undefined") result.post_id = params.post_id;
 
         return result;
     }
