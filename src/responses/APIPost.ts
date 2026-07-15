@@ -1,5 +1,6 @@
 import APIResponse from "./APIResponse";
 
+/** @deprecated */
 export default interface APIPost extends APIResponse {
     id: number;
     created_at: string;

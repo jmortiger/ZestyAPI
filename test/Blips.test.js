@@ -35,9 +35,14 @@ describe("Blips", () => {
         expect(result.data.length).toBeGreaterThan(1);
         expect(result.data[0].creator_id).toBe(211960);
     });
-    test("Fetch blips (404)", async () => {
+    xtest("Fetch blips (404)", async () => {
         const result = await E621.Blips.find({ creator_name: "abcdefg" });
         expect(result.status.code).toBe(404);
+        expect(result.data.length).toBe(0);
+    });
+    test("Fetch blips (none found)", async () => {
+        const result = await E621.Blips.find({ creator_name: "abcdefg" });
+        expect(result.status.code).toBe(200);
         expect(result.data.length).toBe(0);
     });
 

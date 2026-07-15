@@ -7,7 +7,7 @@ describe("PostEvents", () => {
         expect(result.status.code).toBe(200);
         expect(result.data.length).toBe(75);
     });
-    test("Fetch post events (by creator name)", async () => {
+    test("Fetch post events (by creator name; times out, replace)", async () => {
         const result = await E621.PostEvents.find({ creator_name: "bitWolfy" });
         expect(result.status.code).toBe(200);
         expect(result.data.length).toBe(75);
@@ -25,7 +25,7 @@ describe("PostEvents", () => {
         expect(result.data.length).toBeGreaterThan(0);
         expect(result.data[0].id).toBe(13);
     });
-    test("Fetch post events (by creator ID)", async () => {
+    test("Fetch post events (by creator ID; times out, replace)", async () => {
         const result = await E621.PostEvents.find({ creator_id: 211960 });
         expect(result.status.code).toBe(200);
         expect(result.data.length).toBe(75);

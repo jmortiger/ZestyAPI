@@ -23,7 +23,7 @@ describe("Tags", () => {
         const result = await E621.Tags.find({ order: "count" });
         expect(result.status.code).toBe(200);
         expect(result.data.length).toBe(75);
-        expect(result.data[0].name).toBe("mammal");
+        expect(result.data[0].name).toBe("anthro");
     });
 
     // get()

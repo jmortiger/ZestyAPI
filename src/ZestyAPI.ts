@@ -23,16 +23,27 @@ import UtilityEndpoint from "./endpoints/Utility";
 import WikiPagesEndpoint from "./endpoints/WikiPages";
 import InitializationError from "./error/InitializationError";
 
+const MIN_RATE_LIMIT = 500;
+/**
+ * The maximum length of the user agent, auth token, username, and API key. Will
+ * throw auth errors if exceeded.
+ * @todo Test errors being thrown.
+ */
+const MAX_IDENTIFIER_LENGTH = 250;
+
 export default class ZestyAPI {
 
     private static instance: ZestyAPI;
 
+    // IDEA: Make these all readonly, or give them public setters?
     private userAgent: string;
     private rateLimit: number;
     private domain: string;
 
-    private authToken: AuthToken;
-    private authLogin: AuthLogin;
+    private authToken?: AuthToken;
+    private authLogin?: AuthLogin;
+
+    public readonly adjustIqdbRateLimit: boolean;
 
     // Endpoint declarations
     public Blips = new BlipsEndpoint(this);
@@ -57,28 +68,33 @@ export default class ZestyAPI {
 
     private constructor(config: APIConfig = {}) {
         // User Agent
-        if (!config.userAgent || typeof config.userAgent !== "string" || config.userAgent.length > 250)
-            throw InitializationError.UserAgent();
-        else this.userAgent = config.userAgent;
+        if (!config.userAgent ||
+            typeof config.userAgent !== "string" ||
+            config.userAgent.length > MAX_IDENTIFIER_LENGTH
+        ) throw InitializationError.UserAgent();
+        this.userAgent = config.userAgent;
 
         // Rate Limit
-        if (!config.rateLimit || typeof config.rateLimit !== "number" || config.rateLimit < 500)
-            this.rateLimit = 500;
+        if (typeof config.rateLimit !== "number" || config.rateLimit < MIN_RATE_LIMIT)
+            this.rateLimit = MIN_RATE_LIMIT;
         else this.rateLimit = config.rateLimit;
 
         // Domain
-        if (!config.domain) config.domain = "https://e621.net";
-        else if (typeof config.domain !== "string")
-            throw InitializationError.Domain();
+        config.domain ||= (Util.isBrowser && SupportedDomains.isSupportedDomain(window.location.origin)) ? window.location.origin : "https://e621.net";
+        if (typeof config.domain !== "string")
+            throw InitializationError.Domain("invalid type; not a string");
+        // NOTE: If this needs to be a domain, this should be using `origin` instead of `href`.
         try { this.domain = new URL(config.domain).href; }
-        catch { throw InitializationError.Domain(); }
+        catch { throw InitializationError.Domain("failed parsing"); }
 
         // Authentication
-        if (config.authToken) this.login(config.authToken);
-        else if (config.authLogin) this.login(config.authLogin);
+        if (config.authLogin) this.login(config.authLogin);
+        else if (config.authToken) this.login(config.authToken);
 
         // Debug
-        if (config.debug) Logger.debug = true;
+        Logger.debug = !!config.debug;
+
+        this.adjustIqdbRateLimit = (!!config.adjustIqdbRateLimit) && !this.isAuthSet;
     }
 
     /**
@@ -91,17 +107,26 @@ export default class ZestyAPI {
         return this.instance;
     }
 
+    /**
+     * Purge current credentials & store given ones.
+     * @param auth The authentication data to use for requests.
+     *
+     * NOTE: This will only purge old credentials after ensuring new ones are
+     * facially valid.
+     */
     public login(auth: AuthToken | AuthLogin): void {
+        if (typeof auth === "string") {
+            if (!auth || auth.length > MAX_IDENTIFIER_LENGTH)
+                throw InitializationError.Auth("bad auth token; " + !auth ? "empty" : "too long");
+            this.logout();
+            this.authToken = auth;
+            return;
+        } else if (!auth.username || typeof auth.username !== "string" || auth.username.length > MAX_IDENTIFIER_LENGTH) {
+            throw InitializationError.Auth("bad username; " + !auth.username ? "empty" : "too long/invalid type");
+        } else if (!auth.apiKey || typeof auth.apiKey !== "string" || auth.apiKey.length > MAX_IDENTIFIER_LENGTH)
+            throw InitializationError.Auth("bad API key; " + !auth.apiKey ? "empty" : "too long/invalid type");
         this.logout();
-        if (typeof auth == "string") {
-            if (auth.length > 250) throw InitializationError.Auth();
-            else this.authToken = auth;
-        } else {
-            if (!auth.username || typeof auth.username !== "string" || auth.username.length > 250
-                || !auth.apiKey || typeof auth.apiKey !== "string" || auth.apiKey.length > 250)
-                throw InitializationError.Auth();
-            else this.authLogin = auth;
-        }
+        this.authLogin = auth;
     }
 
     public logout(): void {
@@ -109,8 +134,21 @@ export default class ZestyAPI {
         this.authLogin = undefined;
     }
 
-    public getAuthToken(): AuthToken { return this.authToken; }
-    public getAuthLogin(): AuthLogin { return this.authLogin; }
+    /** Retrieve the auth token, or throw an error if not set. */
+    public getAuthToken(): AuthToken {
+        if (this.authToken === undefined) throw new Error("authToken is undefined.");
+        return this.authToken;
+    }
+    /** Retrieve the auth token. */
+    public get safeAuthToken(): AuthToken | undefined { return this.authToken; }
+    /** Retrieve the login data, or throw an error if not set. */
+    public getAuthLogin(): AuthLogin {
+        if (this.authLogin === undefined) throw new Error("authLogin is undefined.");
+        return this.authLogin;
+    }
+    /** Retrieve the login data. */
+    public get safeAuthLogin(): AuthLogin | undefined { return this.authLogin; }
+
     public get isAuthSet(): boolean {
         return typeof this.authToken !== "undefined" || typeof this.authLogin !== "undefined";
     }
@@ -124,46 +162,52 @@ export default class ZestyAPI {
      */
     public makeRequest(endpoint: string, config?: RequestConfig): Promise<any> {
 
-        const requestInfo = {};
-        requestInfo["headers"] = {};
+        const requestInfo: RequestInit = {};
+        requestInfo.headers = {};
 
         /* Validating the request config */
-        if (!config) config = {};
+        config ||= {};
 
         // Request method
-        if (!config.method) config.method = "GET";
-        requestInfo["method"] = config.method;
+        requestInfo.method = config.method ||= "GET";
 
         // Query parameters and headers
-        if (!config.query) config.query = {};
+        config.query ||= {};
         if (Util.isBrowser) config.query["_client"] = encodeURIComponent(this.userAgent);
         else {
-            requestInfo["headers"]["User-Agent"] = this.userAgent;
-            requestInfo["headers"]["X-User-Agent"] = this.userAgent;
+            requestInfo.headers["User-Agent"] = this.userAgent;
+            requestInfo.headers["X-User-Agent"] = this.userAgent;
         }
 
         // Request body
-        if (!config.body) config.body = {};
-        if (config.method !== "GET") {
+        config.body ||= {};
+        if (requestInfo.method !== "GET" && requestInfo.method !== "HEAD") {
             if (this.authToken) config.body["authenticity_token"] = encodeURIComponent(this.authToken);
             // const bodyParams = APIQuery.flatten(config.body);
             if (Object.keys(config.body).length > 0) {
                 const data = new FormData();
                 for (const [key, value] of Object.entries(config.body))
                     data.append(key, value + "");
-                requestInfo["body"] = data;
+                requestInfo.body = data;
             }
+        // TODO: Test this is properly set when using auth tokens over login.
+        // For GET requests when solely using an auth token, adds authentication
+        // in the header to enable access-based requests (e.g. one's own hidden
+        // comments, staff resources, etc) & provide an identity for improved
+        // IQDB throttling.
+        } else if (!this.authLogin && this.authToken) {
+            requestInfo.headers["X-CSRF-Token"] = this.authToken;
         }
-
-        // Timeout
-        if (!config.rateLimit) config.rateLimit = this.rateLimit;
-        else if (config.rateLimit < 500) config.rateLimit = 500;
 
         // Authentication
         if (this.authLogin) {
             // TODO Check if there is a difference in auth between browser and node
-            requestInfo["headers"]["Authorization"] = `Basic ${Util.btoa(this.authLogin.username + ":" + this.authLogin.apiKey)}`;
+            requestInfo.headers["Authorization"] = `Basic ${Util.btoa(this.authLogin.username + ":" + this.authLogin.apiKey)}`;
         }
+
+        // Timeout
+        if ((config.rateLimit ||= this.rateLimit) < MIN_RATE_LIMIT)
+            config.rateLimit = MIN_RATE_LIMIT;
 
         /* Compiling the data and adding it to the queue */
 
@@ -172,7 +216,6 @@ export default class ZestyAPI {
         if (queryParams.length > 0) url += "?" + queryParams.join("&");
 
         return RequestQueue.add(url, requestInfo, config.rateLimit);
-
     }
 
 }
@@ -180,14 +223,40 @@ export default class ZestyAPI {
 if (typeof process === "undefined")
     (window as any).ZestyAPI = ZestyAPI;
 
+enum SupportedDomains {
+    e621 = "https://e621.net",
+    e926 = "https://e926.net",
+    // e6ai = "https://e6ai.net",
+}
+namespace SupportedDomains {
+    export function isSupportedDomain(domain: string) {
+        return !!SupportedDomains[domain];
+    }
+}
 interface APIConfig {
     userAgent?: string,
-    rateLimit?: 500 | number,
+    /** 
+     * The time to wait between requests in milliseconds. If set beneath
+     * `MIN_RATE_LIMIT`, will be set to `MIN_RATE_LIMIT`.
+     */
+    rateLimit?: typeof MIN_RATE_LIMIT | number,
+    /**
+     * @todo e6ai support?
+     */
     domain?: "https://e621.net" | "https://e926.net" | string,
 
     authToken?: AuthToken;
-    authLogin?: AuthLogin
+    authLogin?: AuthLogin;
 
+    /** 
+     * If true, the IQDB rate limit will be adjusted to 60 seconds when used
+     * anonymously.
+     */
+    adjustIqdbRateLimit?: boolean;
+
+    /**
+     * @todo Make a debug *verbosity* (maybe even a verbosity map) instead of a toggle.
+     */
     debug?: boolean;
 }
 

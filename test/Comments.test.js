@@ -52,9 +52,14 @@ describe("Comments", () => {
         expect(result.data.length).toBeGreaterThan(1);
         expect(result.data[0].creator_id).toBe(211960);
     });
-    test("Fetch comments (404)", async () => {
+    xtest("Fetch comments (404)", async () => {
         const result = await E621.Comments.find({ creator_name: "abcdefg" });
         expect(result.status.code).toBe(404);
+        expect(result.data.length).toBe(0);
+    });
+    test("Fetch comments (none found)", async () => {
+        const result = await E621.Comments.find({ creator_name: "abcdefg" });
+        expect(result.status.code).toBe(200);
         expect(result.data.length).toBe(0);
     });
 });

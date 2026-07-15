@@ -5,6 +5,12 @@ import { ResponseCode, ResponseStatusMessage } from "../error/ResponseCode";
 import { APIIQDBResponse } from "../responses/APIIQDBResponse";
 
 export default class IQDBQueriesEndpoint extends Endpoint<APIIQDBResponse> {
+    /**
+     * NOTE: Rate limit for IQDB responses changes from 2 seconds to 60 seconds for anonymous users. See https://github.com/e621ng/e621ng/blob/76f76e5ba32f8c334f8a11311aa99f796dc3f69b/app/controllers/iqdb_queries_controller.rb#L57
+     */
+    private get rateLimit(): number {
+        return this.api.adjustIqdbRateLimit ? 2000 : 60000;
+    }
 
     public async find(query: IQDBQueryParams = {}): Promise<FormattedResponse<APIIQDBResponse>> {
 
@@ -12,7 +18,7 @@ export default class IQDBQueriesEndpoint extends Endpoint<APIIQDBResponse> {
         try { lookup = this.validateParams({}, query); }
         catch (e) { return Endpoint.makeMalformedRequestResponse(); }
 
-        return this.api.makeRequest("iqdb_queries.json", { query: Endpoint.flattenParams(lookup), rateLimit: 2000 })
+        return this.api.makeRequest("iqdb_queries.json", { query: Endpoint.flattenParams(lookup), rateLimit: this.rateLimit })
             .then(
                 (response: QueueResponse) => {
                     if (response.data.posts) {
@@ -33,6 +39,8 @@ export default class IQDBQueriesEndpoint extends Endpoint<APIIQDBResponse> {
 
         if (typeof params?.url !== "undefined") result.url = params.url;
         if (typeof params?.post_id !== "undefined") result.post_id = params.post_id;
+        if (typeof params?.hash !== "undefined") result.hash = params.hash;
+        if (typeof params?.score_cutoff !== "undefined") result.score_cutoff = params.score_cutoff;
 
         return result;
     }
@@ -42,4 +50,6 @@ export default class IQDBQueriesEndpoint extends Endpoint<APIIQDBResponse> {
 interface IQDBQueryParams extends QueryParams {
     url?: string;
     post_id?: number;
+    hash?: string;
+    score_cutoff?: number;
 }

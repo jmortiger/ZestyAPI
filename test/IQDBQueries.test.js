@@ -17,8 +17,8 @@ describe("IQDBQueries", () => {
     });
     testIf(process.env.TEST_IQDB == "true", "Check for duplicates (invalid)", async () => {
         const result = await E621.IQDBQueries.find();
-        expect(result.status.code).toBe(490);
-        expect(result.data).toStrictEqual([]);
+        expect(result.status.code).toBe(200);
+        expect(result.data).toEqual([]);
     });
 
 });

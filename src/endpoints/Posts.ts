@@ -5,6 +5,7 @@ import { PrimitiveMap, SimpleMap } from "../components/UtilType";
 import { MalformedRequestError } from "../error/RequestError";
 import { ResponseCode, ResponseStatusMessage } from "../error/ResponseCode";
 import APIPost from "../responses/APIPost";
+import { ApiPostV2Basic, ApiPostV2Extended, PostV2Thumbnail } from "../responses/APIPostV2";
 
 export default class PostsEndpoint extends Endpoint<APIPost> {
 
@@ -26,7 +27,7 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
      * @returns {FormattedResponse<APIPost[]>} Post data
      * @todo Replace empty object w/ undefined in `validateParams`
      */
-    public async find(query: PostQueryParams = {}): Promise<FormattedResponse<APIPost>> {
+    public async find<Version extends 1 | 2 = 1, Mode extends PostMode | undefined = undefined>(query: PostQueryParams<Version, Mode> = {}): Promise<FormattedResponse<ModeSelect<Version, Mode>>> {
 
         let lookup: PrimitiveMap;
         try { lookup = this.validateParams({}, query); }
@@ -53,11 +54,15 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
      * @param {number} id ID of the post to return
      * @returns {FormattedResponse<APIPost>} Post data
      */
-    public async get(id: number): Promise<FormattedResponse<APIPost>> {
+    public async get<Version extends 1 | 2 = 1, Mode extends PostMode | undefined = undefined>(id: number, query?: PostModeParams<Version, Mode>): Promise<FormattedResponse<ModeSelect<Version, Mode>>> {
         if (typeof id !== "number" || !Number.isInteger(id) || id < 0)
             return Endpoint.makeMalformedRequestResponse();
 
-        return this.api.makeRequest(`posts/${id}.json`)
+        let lookup: PrimitiveMap;
+        try { lookup = this.validateParams({}, query); }
+        catch (e) { return Endpoint.makeMalformedRequestResponse(); }
+
+        return this.api.makeRequest(`posts/${id}.json`, lookup)
             .then(
                 (response: QueueResponse) => {
                     if (!response.data.post) {
@@ -75,9 +80,10 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
 
     /**
      * Fetches data for multiple posts by their IDs.  
-     * Note that up to 100 IDs are accepted at a time. Everything past that will be discarded.
+     * Note that up to 320 IDs are accepted at a time. Everything past that will be discarded.
      * @param ids List of post IDs
      * @returns {FormattedResponse<APIPost[]>} Post data
+     * @todo Account for receiving more than 320 ids; could work for 320 * 40 ids.
      */
     public async getMany(ids: number[]): Promise<FormattedResponse<APIPost>> {
         if (!Array.isArray(ids))
@@ -109,16 +115,17 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
      * Note that the hard limit for this request is 39 tags.  
      * Page number and post limit can be specified as parameters.
      * @param {PostQueryParams} query Search parameters
-     * @param {string} seed Random seed. Optional.
+     * @param {number | string} seed Random seed. Optional. Should be a number.
      * @returns {FormattedResponse<APIPost[]>} Post data
      */
-    public async randomMany(query: PostQueryParams = {}, seed?: string): Promise<FormattedResponse<APIPost>> {
+    public async randomMany(query: PostQueryParams = {}, seed?: number | string): Promise<FormattedResponse<APIPost>> {
 
         if (query.tags) {
             if (!Array.isArray(query.tags)) query.tags = query.tags.trim().split(" ").filter(n => n);
         } else query.tags = [];
 
         query.tags.push("order:random");
+        // TODO: Handle whitespace?
         if (seed) query.tags.push("randseed:" + seed);
 
         return this.find(query);
@@ -169,7 +176,31 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
     }
 }
 
-interface PostQueryParams extends QueryParams {
+type ModeSelect<
+    T extends 1 | 2 = 1,
+    Mode extends PostMode | undefined = undefined,
+    V1 = APIPost,
+    Basic = ApiPostV2Basic,
+    Extended = ApiPostV2Extended,
+    Thumbnail = PostV2Thumbnail,
+> = T extends 1 ?
+    V1 :
+    (T extends 2 ?
+        (Mode extends "extended" ?
+            Extended :
+            (Mode extends "thumbnail" ? Thumbnail : Basic)
+        ) :
+        (V1 | Basic | Extended | Thumbnail)
+    );
+type Versioned<V1, V2, T extends 1 | 2 = 1> = T extends 1 ? V1 : T extends 2 ? V2 : V1 | V2;
+type PostMode = "basic" | "extended" | "thumbnails";
+interface PostModeParams<Version extends 1 | 2 = 1, Mode extends PostMode | undefined = "basic"> extends PrimitiveMap {
+    mode?: Versioned<undefined, Mode, Version>,
+    v1?: Versioned<true | undefined, false | undefined, Version>,
+    v2?: Versioned<false | undefined, true, Version>,
+}
+
+interface PostQueryParams<Version extends 1 | 2 = 1, Mode extends PostMode | undefined = "basic"> extends QueryParams, PostModeParams<Version, Mode> {
     tags?: string | string[]
 }
 
