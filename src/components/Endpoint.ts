@@ -1,3 +1,4 @@
+import { MalformedRequestError } from "../error/RequestError";
 import { ResponseCode, ResponseStatusMessage } from "../error/ResponseCode";
 import APIResponse from "../responses/APIResponse";
 import ZestyAPI from "../ZestyAPI";
@@ -10,8 +11,14 @@ export default class Endpoint<T extends APIResponse> {
     protected api: ZestyAPI;
 
     // Variables used in the inherited `find()` method.
-    protected endpoint = "unknown";     // determines the URL of the endpoint (without .json)
-    protected searchParams: string[] = [];      // list of permitted search parameters
+    /**
+     * Determines the URL of the endpoint (without `.json`).
+     */
+    protected endpoint = "unknown";
+    /**
+     * List of permitted search parameters.
+     */
+    protected searchParams: string[] = [];
     protected searchParamAliases: { [prop: string]: string } = {};
 
     constructor(api: ZestyAPI) {
@@ -94,6 +101,12 @@ export default class Endpoint<T extends APIResponse> {
 
     /**
      * Validates the query parameters for the `find()` methods.
+     * 
+     * Restricts the {@link QueryParams.limit} from 1 to
+     * {@link ZestyAPI.MAX_PAGE_ITEMS}, either restricts the
+     * {@link QueryParams.page} from 1 to {@link ZestyAPI.MAX_PAGE_NUMBER} or
+     * ensures it follows the id-based pagination format.
+     *
      * @param {QueryParams} params Query parameters
      * @returns {QueryParams} Validated parameters
      */
@@ -101,35 +114,99 @@ export default class Endpoint<T extends APIResponse> {
         const results: SearchParams = {};
         if (!params) return results;
 
-        // Result limit
-        // - Number between 1 and 320
         if (params.limit && typeof params.limit == "number")
-            results.limit = Util.Math.clamp(params.limit, 1, 320);
+            results.limit = Util.Math.clamp(Math.round(params.limit), 1, ZestyAPI.MAX_PAGE_ITEMS);
 
-        // Page number
-        // - Number between 1 and 750
-        // - OR number prefixed by `a` (after) or `b` (before)
-        if (params.page) {
-            if (typeof params.page == "number")
-                results.page = Util.Math.clamp(params.page, 1, 750);
-            else if (typeof params.page == "string" && /[ab]\d+/.test(params.page))
-                results.page = params.page;
-        }
+        if ((params.page = this.validatePage(params.page)))
+            results.page = params.page;
 
         return results;
     }
 
     /**
+     * Coerces the given value for the {@link QueryParams.page} parameter to a
+     * valid one.
+     *
+     * @param page The value to validate.
+     * @returns A value that's guaranteed to be a valid value for {@link QueryParams.page}.
+     */
+    public validatePage(page: QueryParams["page"]) {
+        if (!page) return;
+        if (typeof page === "number")
+            return Util.Math.clamp(Math.round(page), 1, ZestyAPI.MAX_PAGE_NUMBER);
+        else if (typeof page === "string" && (page = page.trim()) && (
+                /^[ab]\d+$/.test(page) ||
+                (page = (Number.parseInt(page) || 0)) > 0
+            ))
+            return page;
+    }
+
+    /**
+     * Validates that the given value is valid for the {@link QueryParams.page}
+     * parameter.
+     * 
+     * Unlike {@link validatePage}, this does no coercion at all; if the value
+     * is not valid, you will get either `undefined` or an error will be throw,
+     * depending on the value of `silent`.
+     * @param page The value to validate.
+     * @param {boolean} [silent=true] Should errors for invalid values be suppressed?
+     * @returns The now-guaranteed valid initial value of `page`, or, if `silent`, `undefined`.
+     * @throws {MalformedRequestError} If invalid & `silent` is not true, thrown with a detailed error message for each failing condition.
+     */
+    public validatePageStrict(page: QueryParams["page"], silent = true) {
+        if (page) {
+            if (typeof page === "number") {
+                if (!Number.isInteger(page)) {
+                    if (!silent)
+                        throw new MalformedRequestError(`Invalid page parameter; "${page}" is a number that is not an integer.`);
+                } else if (Util.Math.between(page, 1, ZestyAPI.MAX_PAGE_NUMBER))
+                    return page;
+                else if (!silent)
+                    throw new MalformedRequestError(`Invalid page parameter; "${page}" is a number that is not an integer.`);
+            } else if (typeof page === "string") {
+                if (/^[ab]\d+$/.test(page))
+                    return page;
+                else if (!silent)
+                    throw new MalformedRequestError(`Invalid page parameter; "${page}" is a string that does not conform to the format "^[ab]\\d+$".`);
+            } else if (!silent)
+                throw new MalformedRequestError(`Invalid page parameter; ${page} is not a string, number, nor undefined.`);
+        }
+        if (silent || page === undefined)
+            return;
+        let msg: string;
+        switch (typeof page) {
+            case "string":
+                msg = `a string that does not conform to the format /^[ab]\\d+$/.`;
+                break;
+            case "number":
+                if (isNaN(page)) msg = `a number of the value NaN.`;
+                else msg = `zero, a number that does not conform to the requirement "1 <= x <= ${ZestyAPI.MAX_PAGE_NUMBER}"`;
+                break;
+            default:
+                msg = `not a string, number, or undefined.`;
+                break;
+        }
+        throw new MalformedRequestError(`Invalid page parameter; ${page} is ` + msg);
+    }
+
+    // * @param {boolean} _array True if the output expects an array, false otherwise. Deprecated.
+    /**
      * Shortcut method for making a response in case the search parameters are malformed or missing
-     * @param {bool} array True if the output expects an array, false otherwise
      * @returns API Response
      */
-    protected static makeMalformedRequestResponse(): Promise<FormattedResponse<any>> {
+    protected static makeMalformedRequestResponse(opts: {
+        code?: number,
+        message?: string,
+        url?: string | null
+    } = {
+        code: ResponseCode.MalformedRequest,
+        message: ResponseStatusMessage.MalformedRequest,
+    }): Promise<FormattedResponse<any>> {
         return Promise.resolve({
             status: {
-                code: ResponseCode.MalformedRequest,
-                message: ResponseStatusMessage.MalformedRequest,
-                url: null,
+                code: opts?.code || ResponseCode.MalformedRequest,
+                message: opts?.message || ResponseStatusMessage.MalformedRequest,
+                url: opts?.url || null,
             },
             data: [],
         });
@@ -199,7 +276,7 @@ export default class Endpoint<T extends APIResponse> {
     /**
      * Validates the raw API response and returns a consistent response
      * @param {ResponseStatus} status First portion of the API response
-     * @param {T} data Second part of the API response
+     * @param {T[]} data Second part of the API response
      * @returns 
      */
     protected static formatAPIResponse<T extends APIResponse>(status: ResponseStatus, data: T[]): FormattedResponse<T> {
@@ -213,25 +290,35 @@ export default class Endpoint<T extends APIResponse> {
 }
 
 /**
- * Search parameters for the `find()` methods.  
+ * `search[???]` parameters for the `find()` methods.
+ *
+ * By placing these parameters here, it enables us to properly adjust them for
+ * the query string (for `GET`/`HEAD` requests) or the body.
+ *
  * Empty by default. Extend this interface to add more.
  */
 export interface SearchParams extends PrimitiveMap, QueryParams { }
 
 /**
- * Query parameters for the `find()` methods.  
- * Include the result limit and page number common for all endpoints
+ * Query parameters for the `find()` methods.
+ *
+ * Includes the pagination parameters common to all endpoints.
  */
+// export interface QueryParams<T extends number = 1> extends PrimitiveMap {
 export interface QueryParams extends PrimitiveMap {
     /**
      * Number of posts on the page.  
-     * Number between 1 and 320, defaults to 75
+     * Whole number between 1 & {@link ZestyAPI.MAX_PAGE_ITEMS}, defaults to 75.
      */
-    limit?: number | 75 | 320,
+    limit?: number | 75 | typeof ZestyAPI.MAX_PAGE_ITEMS,
     /**
      * Page number. Two possible formats:  
-     * - Number between 1 and 750, defaults to 1
-     * - String, prefixed with either `a` (after)` or `b` (before), followed by an ID
+     * - Whole number between 1 and {@link ZestyAPI.MAX_PAGE_NUMBER}
+     * - String, prefixed with either `a` (after)` or `b` (before), followed by
+     * positive whole number for the ID.
+     *
+     * Defaults to 1.
      */
-    page?: number | string,
+    page?: number | string | 1 | typeof ZestyAPI.MAX_PAGE_NUMBER,
+    // page?: number | `a${T}` | `b${T}`,
 }

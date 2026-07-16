@@ -1,4 +1,3 @@
-import APIResponse from "./APIResponse";
 import { APITagCategory } from "./APITag";
 
 // #region Helper Types
@@ -52,7 +51,7 @@ type FilesData<T extends boolean = boolean> = {
 /**
  * @todo Leverage [`Extract<T, U>`](https://www.typescriptlang.org/docs/handbook/utility-types.html#extracttype-union)
  */
-export type ApiPostV2Basic<T extends boolean = boolean> = {
+export type ApiPostBasic<T extends boolean = boolean> = {
     id: number,
     created_at: Revivable<Date, string, T>,
     updated_at: Revivable<Date, string, T>,
@@ -92,15 +91,15 @@ export type ApiPostV2Basic<T extends boolean = boolean> = {
     tags: string[],
 };
 
-type ApiPostV2BasicRevivedFields = {
-    created_at: ApiPostV2Basic<true>["created_at"],
-    updated_at: ApiPostV2Basic<true>["updated_at"],
-    url: ApiPostV2Basic<true>["files"]["original"]["url"],
-    jpg: ApiPostV2Basic<true>["files"]["preview"]["jpg"],
-    webp: ApiPostV2Basic<true>["files"]["preview"]["webp"],
-    sources: ApiPostV2Basic<true>["sources"],
+type ApiPostBasicRevivedFields = {
+    created_at: ApiPostBasic<true>["created_at"],
+    updated_at: ApiPostBasic<true>["updated_at"],
+    url: ApiPostBasic<true>["files"]["original"]["url"],
+    jpg: ApiPostBasic<true>["files"]["preview"]["jpg"],
+    webp: ApiPostBasic<true>["files"]["preview"]["webp"],
+    sources: ApiPostBasic<true>["sources"],
 };
-const basicRevivedKeys: Readonly<(keyof ApiPostV2BasicRevivedFields)[]> = Object.freeze([
+const basicRevivedKeys: Readonly<(keyof ApiPostBasicRevivedFields)[]> = Object.freeze([
     "created_at",
     "updated_at",
     "url",
@@ -108,7 +107,7 @@ const basicRevivedKeys: Readonly<(keyof ApiPostV2BasicRevivedFields)[]> = Object
     "webp",
     "sources",
 ]);
-function postBasicReviver<Key extends keyof ApiPostV2BasicRevivedFields>(key: Key, value: any, context?: { source: string }): ApiPostV2BasicRevivedFields[Key] {
+function postBasicReviver<Key extends keyof ApiPostBasicRevivedFields>(key: Key, value: any, context?: { source: string }): ApiPostBasicRevivedFields[Key] {
     switch (key) {
         case "updated_at":
         case "created_at":
@@ -125,21 +124,21 @@ function postBasicReviver<Key extends keyof ApiPostV2BasicRevivedFields>(key: Ke
         default: return value;
     }
 }
-export namespace ApiPostV2Basic {
-    export function fromBasicJson(json: string | ApiPostV2Basic) {
+export namespace ApiPostBasic {
+    export function fromBasicJson(json: string | ApiPostBasic) {
         if (typeof json === "string") return JSON.parse(json, postBasicReviver as (key: string, value: any) => any);
         for (const element of basicRevivedKeys) {
-            (json[element] as ApiPostV2BasicRevivedFields[typeof element]) = postBasicReviver(element, json[element]);
+            (json[element] as ApiPostBasicRevivedFields[typeof element]) = postBasicReviver(element, json[element]);
         }
-        return json as ApiPostV2Basic<true>;
+        return json as ApiPostBasic<true>;
     }
 }
 // #endregion Basic
 
 // #region Extended
-export type ApiPostV2Extended<T extends boolean = boolean> = Pick<Omit<ApiPostV2Basic<T>, "tags"> & { tags: TagMap }, keyof ApiPostV2Basic>;
+export type ApiPostExtended<T extends boolean = boolean> = Pick<Omit<ApiPostBasic<T>, "tags"> & { tags: TagMap }, keyof ApiPostBasic>;
 
-type ApiPostV2ExtendedRevivedFields<Revived extends boolean = true> = {
+type ApiPostExtendedRevivedFields<Revived extends boolean = true> = {
     created_at: Revivable<Date, string, Revived>,
     updated_at: Revivable<Date, string, Revived>,
     url: Revivable<URL, string, Revived>,
@@ -147,7 +146,7 @@ type ApiPostV2ExtendedRevivedFields<Revived extends boolean = true> = {
     webp: Revivable<URL, string, Revived>,
     sources: Revivable<SourceUrl[], string[], Revived>,
 };
-const extendedRevivedKeys: Readonly<(keyof ApiPostV2ExtendedRevivedFields)[]> = Object.freeze([
+const extendedRevivedKeys: Readonly<(keyof ApiPostExtendedRevivedFields)[]> = Object.freeze([
     "created_at",
     "updated_at",
     "url",
@@ -155,7 +154,7 @@ const extendedRevivedKeys: Readonly<(keyof ApiPostV2ExtendedRevivedFields)[]> = 
     "webp",
     "sources",
 ]);
-function postExtendedReviver<Key extends keyof ApiPostV2ExtendedRevivedFields>(key: Key, value: any, context?: { source: string }): ApiPostV2ExtendedRevivedFields[Key] {
+function postExtendedReviver<Key extends keyof ApiPostExtendedRevivedFields>(key: Key, value: any, context?: { source: string }): ApiPostExtendedRevivedFields[Key] {
     switch (key) {
         case "updated_at":
         case "created_at":
@@ -172,19 +171,19 @@ function postExtendedReviver<Key extends keyof ApiPostV2ExtendedRevivedFields>(k
         default: return value;
     }
 }
-export namespace ApiPostV2Extended {
-    export function fromExtendedJson(json: string | ApiPostV2Extended) {
+export namespace ApiPostExtended {
+    export function fromExtendedJson(json: string | ApiPostExtended) {
         if (typeof json === "string") return JSON.parse(json, postExtendedReviver as (key: string, value: any) => any);
         for (const element of extendedRevivedKeys) {
-            (json[element] as ApiPostV2ExtendedRevivedFields[typeof element]) = postExtendedReviver(element, json[element]);
+            (json[element] as ApiPostExtendedRevivedFields[typeof element]) = postExtendedReviver(element, json[element]);
         }
-        return json as ApiPostV2Extended<true>;
+        return json as ApiPostExtended<true>;
     }
 }
 // #endregion Extended
 
 // #region Thumbnail
-export type PostV2Thumbnail<IsRevived extends boolean = boolean> = {
+export type ApiPostThumbnail<IsRevived extends boolean = boolean> = {
     id: number,
     created_at: Revivable<Date, string, IsRevived>,
     md5: string,
@@ -215,7 +214,7 @@ export type PostV2Thumbnail<IsRevived extends boolean = boolean> = {
     /** Space-separated list of tags. */
     tags: Revivable<string[], string, IsRevived>,
 };
-type PostV2ThumbnailFieldsAfterRevive = {
+type ApiPostThumbnailFieldsAfterRevive = {
     created_at: Date,
     preview_url: URL,
     preview_webp: URL,
@@ -236,7 +235,7 @@ const thumbnailRevivedKeys = Object.freeze([
     "pools", //: number[] | string,
     "tags", //: string[] | string,
 ]);
-function postThumbnailReviver<Key extends keyof PostV2ThumbnailFieldsAfterRevive>(key: Key, value: any, context?: { source: string }): PostV2ThumbnailFieldsAfterRevive[Key] {
+function postThumbnailReviver<Key extends keyof ApiPostThumbnailFieldsAfterRevive>(key: Key, value: any, context?: { source: string }): ApiPostThumbnailFieldsAfterRevive[Key] {
     if (!thumbnailRevivedKeys.includes(key)) return value;
     switch (key) {
         // case "updated_at":
@@ -261,18 +260,18 @@ function postThumbnailReviver<Key extends keyof PostV2ThumbnailFieldsAfterRevive
             return value;
     }
 }
-export function fromThumbnailJson(json: string | PostV2Thumbnail) {
-    if (typeof json === "string") return JSON.parse(json, postThumbnailReviver as (key: string, value: any) => any) as PostV2Thumbnail<true>;
-    for (const element of thumbnailRevivedKeys as (keyof PostV2ThumbnailFieldsAfterRevive)[]) {
+export function fromThumbnailJson(json: string | ApiPostThumbnail) {
+    if (typeof json === "string") return JSON.parse(json, postThumbnailReviver as (key: string, value: any) => any) as ApiPostThumbnail<true>;
+    for (const element of thumbnailRevivedKeys as (keyof ApiPostThumbnailFieldsAfterRevive)[]) {
         (json[element] as any) = postThumbnailReviver(element, json[element]);
     }
-    return json as PostV2Thumbnail<true>;
+    return json as ApiPostThumbnail<true>;
 }
 // #endregion Thumbnail
 
 export namespace APIPost {
 
-    export function getTags(post: ApiPostV2Basic | ApiPostV2Extended | PostV2Thumbnail): string[] {
+    export function getTags(post: ApiPostBasic | ApiPostExtended | ApiPostThumbnail): string[] {
         if (typeof post.tags === "string")
             return post.tags.split(/\s/);
         if (post.tags instanceof Array)
@@ -289,11 +288,11 @@ export namespace APIPost {
         ];
     }
 
-    export function getTagString(post: ApiPostV2Basic | ApiPostV2Extended | PostV2Thumbnail): string {
+    export function getTagString(post: ApiPostBasic | ApiPostExtended | ApiPostThumbnail): string {
         return APIPost.getTags(post).join(" ");
     }
 
-    export function getTagSet(post: ApiPostV2Basic | ApiPostV2Extended | PostV2Thumbnail): Set<string> {
+    export function getTagSet(post: ApiPostBasic | ApiPostExtended | ApiPostThumbnail): Set<string> {
         return new Set(APIPost.getTags(post));
     }
 

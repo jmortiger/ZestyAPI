@@ -1,6 +1,8 @@
 import APIResponse from "./APIResponse";
 
-/** @deprecated */
+/**
+ * @deprecated In the process of being phased out; see forum [topic #63849](<https://e621.net/forum_topics/63849>) for details.
+ */
 export default interface APIPost extends APIResponse {
     id: number;
     created_at: string;

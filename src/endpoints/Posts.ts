@@ -5,7 +5,7 @@ import { PrimitiveMap, SimpleMap } from "../components/UtilType";
 import { MalformedRequestError } from "../error/RequestError";
 import { ResponseCode, ResponseStatusMessage } from "../error/ResponseCode";
 import APIPost from "../responses/APIPost";
-import { ApiPostV2Basic, ApiPostV2Extended, PostV2Thumbnail } from "../responses/APIPostV2";
+import { ApiPostBasic, ApiPostExtended, ApiPostThumbnail } from "../responses/APIPostV2";
 
 export default class PostsEndpoint extends Endpoint<APIPost> {
 
@@ -23,7 +23,7 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
      * Search for posts with specified tags.  
      * Note that the hard limit for this request is 40 tags.  
      * Page number and post limit can be specified as parameters.
-     * @param {PostSearchParams} params Search parameters
+     * @param {PostQueryParams} query Search parameters
      * @returns {FormattedResponse<APIPost[]>} Post data
      * @todo Replace empty object w/ undefined in `validateParams`
      */
@@ -79,8 +79,10 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
     }
 
     /**
-     * Fetches data for multiple posts by their IDs.  
-     * Note that up to 320 IDs are accepted at a time. Everything past that will be discarded.
+     * Fetches data for multiple posts by their IDs.
+     * 
+     * Note that up to {@link ZestyAPI.MAX_PAGE_ITEMS} IDs are accepted at a time; any more than
+     * that will throw an error unless silenced via `discardOverflow`.
      * @param ids List of post IDs
      * @returns {FormattedResponse<APIPost[]>} Post data
      * @todo Account for receiving more than 320 ids; could work for 320 * 40 ids.
@@ -170,22 +172,34 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
         else if (Array.isArray(params.tags)) result.tags = params.tags;
         else throw MalformedRequestError.Params();
 
-        if (result.tags.length > 40) throw MalformedRequestError.TooMany("tags");
+        if (result.tags.length > ZestyAPI.MAX_POST_SEARCH_TOKENS)
+            throw MalformedRequestError.TooMany("tags");
 
         return result as PostQueryParams;
     }
 }
 
+// #region Version Types
+/**
+ * Conditionally evaluates the type.
+ *
+ * * If the version is `1`:
+ *    * `V1` (default `APIPost`)
+ * * otherwise (version is `2`), if the mode is:
+ *    * `"extended"`, `Extended` (default `ApiPostExtended`)
+ *    * `"thumbnails"`, `Thumbnail` (default `ApiPostThumbnail`)
+ *    * otherwise (mode is `basic` or undefined), `Basic` (default `ApiPostBasic`)
+ */
 type ModeSelect<
-    T extends 1 | 2 = 1,
+    Version extends 1 | 2 = 1,
     Mode extends PostMode | undefined = undefined,
     V1 = APIPost,
-    Basic = ApiPostV2Basic,
-    Extended = ApiPostV2Extended,
-    Thumbnail = PostV2Thumbnail,
-> = T extends 1 ?
+    Basic = ApiPostBasic,
+    Extended = ApiPostExtended,
+    Thumbnail = ApiPostThumbnail,
+> = Version extends 1 ?
     V1 :
-    (T extends 2 ?
+    (Version extends 2 ?
         (Mode extends "extended" ?
             Extended :
             (Mode extends "thumbnail" ? Thumbnail : Basic)
@@ -199,6 +213,7 @@ interface PostModeParams<Version extends 1 | 2 = 1, Mode extends PostMode | unde
     v1?: Versioned<true | undefined, false | undefined, Version>,
     v2?: Versioned<false | undefined, true, Version>,
 }
+// #endregion Version Types
 
 interface PostQueryParams<Version extends 1 | 2 = 1, Mode extends PostMode | undefined = "basic"> extends QueryParams, PostModeParams<Version, Mode> {
     tags?: string | string[]

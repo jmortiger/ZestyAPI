@@ -23,15 +23,49 @@ import UtilityEndpoint from "./endpoints/Utility";
 import WikiPagesEndpoint from "./endpoints/WikiPages";
 import InitializationError from "./error/InitializationError";
 
-const MIN_RATE_LIMIT = 500;
-/**
- * The maximum length of the user agent, auth token, username, and API key. Will
- * throw auth errors if exceeded.
- * @todo Test errors being thrown.
- */
-const MAX_IDENTIFIER_LENGTH = 250;
+/** @see ZestyAPI.MIN_RATE_LIMIT */ const MIN_RATE_LIMIT = 500;
+/** @see ZestyAPI.MAX_IDENTIFIER_LENGTH */ const MAX_IDENTIFIER_LENGTH = 250;
+/** @see ZestyAPI.MAX_PAGE_NUMBER */ const MAX_PAGE_NUMBER = 750;
+/** @see ZestyAPI.MAX_PAGE_ITEMS */ const MAX_PAGE_ITEMS = 320;
+/** @see ZestyAPI.MAX_POST_SEARCH_TOKENS */ const MAX_POST_SEARCH_TOKENS = 40;
 
 export default class ZestyAPI {
+
+    /**
+     * The minimum accepted rate limit; if an attempt to use a lower rate limit
+     * is made, it will be changed to this value.
+     * @todo Test rate limit always being >= this.
+     */
+    public static get MIN_RATE_LIMIT(): typeof MIN_RATE_LIMIT { return MIN_RATE_LIMIT; }
+
+    /**
+     * The maximum length of the user agent, auth token, username, and API key. Will
+     * throw auth errors if exceeded.
+     * @todo Test errors being thrown.
+     */
+    public static get MAX_IDENTIFIER_LENGTH(): typeof MAX_IDENTIFIER_LENGTH { return MAX_IDENTIFIER_LENGTH; }
+
+    /**
+     * The maximum page value for a query; the server will not paginate beyond
+     * this value.
+     * @todo Ensure always overridden.
+     */
+    public static get MAX_PAGE_NUMBER(): typeof MAX_PAGE_NUMBER { return MAX_PAGE_NUMBER; }
+
+    /**
+     * The maximum number of items allowed on a page; the server will not return
+     * more than this many items per page.
+     * @todo Ensure always overridden.
+     */
+    public static get MAX_PAGE_ITEMS(): typeof MAX_PAGE_ITEMS { return MAX_PAGE_ITEMS; }
+
+    /**
+     * The maximum number of space-separated search tokens (discounting group
+     * delimiters) allowed when making a post search; the server will not run
+     * the search if more than this many items are used.
+     * @todo Ensure always overridden.
+     */
+    public static get MAX_POST_SEARCH_TOKENS(): typeof MAX_POST_SEARCH_TOKENS { return MAX_POST_SEARCH_TOKENS; }
 
     private static instance: ZestyAPI;
 
@@ -233,19 +267,39 @@ namespace SupportedDomains {
         return !!SupportedDomains[domain];
     }
 }
+
+/**
+ * @todo Expand with stuff like per-endpoint default values for limit & page.
+ */
 interface APIConfig {
     userAgent?: string,
     /** 
      * The time to wait between requests in milliseconds. If set beneath
-     * `MIN_RATE_LIMIT`, will be set to `MIN_RATE_LIMIT`.
+     * {@link ZestyAPI.MIN_RATE_LIMIT}
+     * , will be set to `MIN_RATE_LIMIT`.
      */
-    rateLimit?: typeof MIN_RATE_LIMIT | number,
+    rateLimit?: typeof ZestyAPI.MIN_RATE_LIMIT | number,
     /**
      * @todo e6ai support?
      */
     domain?: "https://e621.net" | "https://e926.net" | string,
 
+    /**
+     * The token given to authenticate user identity in the browser.
+     * 
+     * If practical, {@link authLogin} *might* be preferred; requires further
+     * testing.
+     * @todo Allow both to be provided.
+     */
     authToken?: AuthToken;
+    /**
+     * The user's authentication details used to authenticate user identity in
+     * all non-browser contexts.
+     * 
+     * If practical, this *might* be preferred over {@link authToken}; requires
+     * further testing.
+     * @todo Allow both to be provided.
+     */
     authLogin?: AuthLogin;
 
     /** 

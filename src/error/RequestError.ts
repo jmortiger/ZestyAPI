@@ -6,9 +6,10 @@ export default class RequestError extends Error {
 }
 
 export class MalformedRequestError extends RequestError {
+    public static prependType = false;
     public constructor(message?: string) {
         if (!message) message = "Unknown request error";
-        super("MalformedConfigError: " + message);
+        super((MalformedRequestError.prependType ? "MalformedRequestError: " : "") + message);
     }
 
     public static Params(): MalformedRequestError {
