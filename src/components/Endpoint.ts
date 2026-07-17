@@ -4,7 +4,7 @@ import APIResponse from "../responses/APIResponse";
 import ZestyAPI from "../ZestyAPI";
 import { FormattedResponse, QueueResponse, ResponseStatus } from "./RequestQueue";
 import Util from "./Util";
-import { PrimitiveMap, PrimitiveType, StringMap } from "./UtilType";
+import { PrimitiveMap, PrimitiveType, Revivable, StringMap } from "./UtilType";
 
 export default class Endpoint<T extends APIResponse> {
 
@@ -298,6 +298,94 @@ export default class Endpoint<T extends APIResponse> {
  * Empty by default. Extend this interface to add more.
  */
 export interface SearchParams extends PrimitiveMap, QueryParams { }
+
+export type Ordering<T extends string = "id_desc"> = "id_desc" | "id_asc" | T;
+
+/**
+ * A search/query parameter that follows the range syntax.
+ *
+ * | Description | Example |
+ * | :--------------|:-----|
+ * | A single value | `search[score]=15` |
+ * | From 2 - {@link ZestyAPI.MAX_PAGE_ITEMS} comma-separated values | `search[created_at]=1_week_ago,jan-1-2020,jan-1-2021,jan-1-2022`|
+ * | A start & end range delimited by `..` | `tags=score:25..30` |
+ * | An (in)equality | search[updated_at]=>yesterday |
+ *
+ * Supports
+ * * Numbers without units (e.g. ids)
+ * * Dates
+ * * File sizes with units
+ * 
+ * Used for:
+ * * `id` when used directly.
+ * * Post approval/disapproval: `post_id`
+ * * Mod actions: numeric JSONB attributes
+ * * Artist: `artist_id`
+ *
+ * @todo Add option to provide typed range values that don't rely on the string format.
+ */
+export type RangeParam<
+    Type,
+    NonSerialized extends boolean = boolean,
+> = Revivable<Type | Type[] | string, string, NonSerialized>;
+/**
+ * A search/query parameter that can be either a single id value or a comma-separated list of 2 - {@link ZestyAPI.MAX_PAGE_ITEMS} user ids.
+ * 
+ * These are parsed using [`where_user`
+ * ](https://github.com/e621ng/e621ng/blob/master/app/models/application_record.rb#L134),
+ * not [`attribute_matches`
+ * ](https://github.com/e621ng/e621ng/blob/master/app/models/application_record.rb#L35),
+ * so they only support the comma syntax, not the full range syntax. If both
+ * this & the corresponding `_name` field are provided, this will overwrite the
+ * name field server-side.
+ */
+export type UserIdParam<
+    NonSerialized extends boolean = boolean,
+> = Revivable<number | number[], number | string, NonSerialized>;
+/**
+ * A search/query parameter that can be either a single id value or a
+ * comma-separated list of ids.
+ * 
+ * These are parsed ad-hoc using neither [`where_user`
+ * ](https://github.com/e621ng/e621ng/blob/master/app/models/application_record.rb#L134),
+ * nor [`attribute_matches`
+ * ](https://github.com/e621ng/e621ng/blob/master/app/models/application_record.rb#L35),
+ * so they only support the comma syntax, not the full range syntax, & with
+ * unknown max lengths.
+ * 
+ * Used by:
+ * * Note: `post_id`
+ */
+export type CsvParam<
+    Type,
+    NonSerialized extends boolean = boolean,
+> = Revivable<Type | Type[] | string, string, NonSerialized>;
+export interface CommonParams<NonSerialized extends boolean = boolean> {
+    /**
+     * Search for a specific id. Follows [the range syntax](https://e926.net/help/cheatsheet#rangesyntax). Multiple can be separated by commas, up to {@link ZestyAPI.MAX_PAGE_ITEMS}.
+     */
+    id?: RangeParam<number, NonSerialized>,
+    /**
+     * The date the resource was created.
+     * 
+     * This doesn't have to be an ISO-compliant string (though ideally it is);
+     * see [Ruby's Date.parse 
+     * method](https://ruby-doc.org/3.3.1/exts/date/Date.html#method-c-parse)
+     * for details. If not a date recognizable by JS's `Date`, this is not
+     * deserializable by this utility.
+     */
+    created_at?: RangeParam</* Date */string, NonSerialized>,
+    /**
+     * The date the resource was updated.
+     * 
+     * This doesn't have to be an ISO-compliant string (though ideally it is);
+     * see [Ruby's Date.parse 
+     * method](https://ruby-doc.org/3.3.1/exts/date/Date.html#method-c-parse)
+     * for details. If not a date recognizable by JS's `Date`, this is not
+     * deserializable by this utility.
+     */
+    updated_at?: RangeParam</* Date */string, NonSerialized>,
+}
 
 /**
  * Query parameters for the `find()` methods.

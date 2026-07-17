@@ -14,6 +14,7 @@ import PostEventsEndpoint from "./endpoints/PostEvents";
 import PostsEndpoint from "./endpoints/Posts";
 import PostSets from "./endpoints/PostSets";
 import PostVotes from "./endpoints/PostVotes";
+import StaffNotesEndpoint from "./endpoints/StaffNotes";
 import TagAliasesEndpoint from "./endpoints/TagAliases";
 import TagImplicationsEndpoint from "./endpoints/TagImplications";
 import TagsEndpoint from "./endpoints/Tags";
@@ -92,6 +93,7 @@ export default class ZestyAPI {
     public PostEvents = new PostEventsEndpoint(this);
     public PostSets = new PostSets(this);
     public PostVotes = new PostVotes(this);
+    public StaffNotes = new StaffNotesEndpoint(this);
     public Tags = new TagsEndpoint(this);
     public TagAliases = new TagAliasesEndpoint(this);
     public TagImplications = new TagImplicationsEndpoint(this);

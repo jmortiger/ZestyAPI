@@ -53,3 +53,10 @@ E621.login({
     apiKey: YourAPIKey
 });
 ```
+
+# Contributing
+## Testing
+This project includes some endpoints and features that are only usable by e621
+staff members, such as staff notes. If you'd like to run the full test suite,
+you can run the e621ng developer environment locally and pass in localhost for
+the domain (along with the appropriate credentials) to test everything properly.

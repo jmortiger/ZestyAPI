@@ -1,3 +1,4 @@
+import { Revivable } from "../components/UtilType";
 import { APITagCategory } from "./APITag";
 
 // #region Helper Types
@@ -6,7 +7,6 @@ type FileExtension = "jpg" | "png" | "gif" | "webm" | "webp" | "mp4" | "swf";
 type Rating = "s" | "q" | "e";
 type TagMap = { [key in Lowercase<keyof typeof APITagCategory>]-?: string[] };
 type SourceUrl = { isDead: boolean, url: URL, raw: string };
-type Revivable<Revived, Raw, T extends boolean = boolean> = T extends true ? Revived : T extends false ? Raw : Revived | Raw;
 type ImageData<T extends boolean = boolean> = {
     width: number,
     height: number,
