@@ -6,6 +6,7 @@ import { MalformedRequestError } from "../error/RequestError";
 import { ResponseCode, ResponseStatusMessage } from "../error/ResponseCode";
 import APIPost from "../responses/APIPost";
 import { ApiPostBasic, ApiPostExtended, ApiPostThumbnail } from "../responses/APIPostV2";
+import ZestyAPI from "../ZestyAPI";
 
 export default class PostsEndpoint extends Endpoint<APIPost> {
 
