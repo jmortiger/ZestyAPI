@@ -1,4 +1,6 @@
 const E621 = require("./_tests");
+const ZestyAPI = require("../dist/ZestyAPI");
+const testData = require("./testData.json");
 
 describe("Posts", () => {
     // find()
@@ -66,12 +68,24 @@ describe("Posts", () => {
     });
 
     // getMany()
+    //
     describe("getMany/index via `id:`", () => {
+        //order:id status:any
         test("Fetch many posts (by IDs)", async () => {
             const result = await E621.Posts.getMany([12345, 12346, 12347]);
             expect(result.status.code).toBe(200);
             expect(result.data.length).toBe(3);
-        })
+        });
+        test("Fetch many posts (by IDs; should split across tokens)", async () => {
+            const result = await E621.Posts.getMany(testData.oldestActivePosts.splice(0, ZestyAPI.MAX_PAGE_ITEMS * 3), true);
+            expect(result.status.code).toBe(200);
+            expect(result.data.length).toBe(ZestyAPI.MAX_PAGE_ITEMS * 3);
+        });
+        test("Fetch many posts (by IDs; more than max; error)", async () => {
+            const result = await E621.Posts.getMany(testData.oldestActivePosts, true);
+            expect(result.status.code).toBe(200);
+            expect(result.data.length).toBe(3);
+        });
     });
 
     // random()

@@ -73,7 +73,8 @@ export default class ZestyAPI {
     // IDEA: Make these all readonly, or give them public setters?
     private userAgent: string;
     private rateLimit: number;
-    private domain: string;
+    private _domain: string;
+    public get domain() { return this._domain; }
 
     private authToken?: AuthToken;
     private authLogin?: AuthLogin;
@@ -120,7 +121,7 @@ export default class ZestyAPI {
         if (typeof config.domain !== "string")
             throw InitializationError.Domain("invalid type; not a string");
         // NOTE: If this needs to be a domain, this should be using `origin` instead of `href`.
-        try { this.domain = new URL(config.domain).href; }
+        try { this._domain = new URL(config.domain).href; }
         catch { throw InitializationError.Domain("failed parsing"); }
 
         // Authentication

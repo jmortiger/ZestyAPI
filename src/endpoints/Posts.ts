@@ -6,6 +6,7 @@ import { MalformedRequestError } from "../error/RequestError";
 import { ResponseCode, ResponseStatusMessage } from "../error/ResponseCode";
 import APIPost from "../responses/APIPost";
 import { ApiPostBasic, ApiPostExtended, ApiPostThumbnail } from "../responses/APIPostV2";
+import ZestyAPI from "../ZestyAPI";
 
 export default class PostsEndpoint extends Endpoint<APIPost> {
 
@@ -81,16 +82,53 @@ export default class PostsEndpoint extends Endpoint<APIPost> {
     /**
      * Fetches data for multiple posts by their IDs.
      * 
-     * Note that up to {@link ZestyAPI.MAX_PAGE_ITEMS} IDs are accepted at a time; any more than
+     * Note that up to {@link ZestyAPI.MAX_PAGE_ITEMS} * {@link ZestyAPI.MAX_POST_SEARCH_TOKENS} IDs are accepted at a time; any more than
      * that will throw an error unless silenced via `discardOverflow`.
      * @param ids List of post IDs
+     * @param {boolean} [discardOverflow=true] Should ids be silently discarded when given more than {@link ZestyAPI.MAX_PAGE_ITEMS} * {@link ZestyAPI.MAX_POST_SEARCH_TOKENS}?
      * @returns {FormattedResponse<APIPost[]>} Post data
-     * @todo Account for receiving more than 320 ids; could work for 320 * 40 ids.
+     * @todo Test accounting for receiving more than 320 ids.
+     * @todo Doesn't work b/c URI is too long.
+     * @todo Not useful since it would be more than the max page length anyways; would take multiple requests.
      */
-    public async getMany(ids: number[]): Promise<FormattedResponse<APIPost>> {
+    public async getMany(ids: number[], discardOverflow = true): Promise<FormattedResponse<APIPost>> {
         if (!Array.isArray(ids))
-            return Endpoint.makeMalformedRequestResponse();
-        return this.find({ tags: "id:" + ids.join(",") });
+            return Endpoint.makeMalformedRequestResponse({
+                message: "Given an 'array' of ids that is not an array.",
+                url: this.api.domain + this.endpoint,
+            });
+        if (ids.length <= ZestyAPI.MAX_PAGE_ITEMS)
+            return this.find({ tags: "id:" + ids.join(",") });
+        if (ids.length > (ZestyAPI.MAX_PAGE_ITEMS * ZestyAPI.MAX_POST_SEARCH_TOKENS) && !discardOverflow)
+            // throw MalformedRequestError.TooMany("tags");
+            return Endpoint.makeMalformedRequestResponse({
+                message: `Given *way* too many IDs (${ids.length}; max is ${ZestyAPI.MAX_PAGE_ITEMS} * ${ZestyAPI.MAX_POST_SEARCH_TOKENS} = ${ZestyAPI.MAX_PAGE_ITEMS * ZestyAPI.MAX_POST_SEARCH_TOKENS}); that's *absurd*, change what you're doing.`,
+                url: this.api.domain + this.endpoint,
+            });
+        const idsArrays = [ids], givenCount = idsArrays[0]!.length, projected = Math.ceil(givenCount / ZestyAPI.MAX_PAGE_ITEMS);
+        for (
+            let l = idsArrays[0]!.length - ZestyAPI.MAX_PAGE_ITEMS, counter = discardOverflow ? 0 : -1;
+            l > 0 &&
+                counter < projected &&
+                (discardOverflow ? true : counter < ZestyAPI.MAX_POST_SEARCH_TOKENS);
+            l = idsArrays[0]!.length - ZestyAPI.MAX_PAGE_ITEMS, counter++
+        ) {
+            idsArrays.push(
+                idsArrays[0]!.splice(
+                    ZestyAPI.MAX_PAGE_ITEMS,
+                    Math.min(ZestyAPI.MAX_PAGE_ITEMS, l),
+                ),
+            );
+        }
+        if (idsArrays.length > ZestyAPI.MAX_POST_SEARCH_TOKENS) {
+            if (discardOverflow) {
+                const discards = idsArrays.splice(ZestyAPI.MAX_POST_SEARCH_TOKENS, idsArrays.length - ZestyAPI.MAX_POST_SEARCH_TOKENS)
+                console.warn("Provided too many ids; discarding the final %s ids", discards.reduce((p, e) => {p.push(...e); return p}, [] as number[]));
+            }
+            else
+                throw new Error(`Logic failed; ${idsArrays.length - ZestyAPI.MAX_POST_SEARCH_TOKENS} too many tokens created.`);
+        }
+        return this.find({ tags: idsArrays.map(e => "~id:" + e.join(",")).join(" "), limit: ZestyAPI.MAX_PAGE_ITEMS, });
     }
 
     /**
